@@ -162,6 +162,7 @@ def merge_table(dataset_id, staging_table_id, main_table_id, unique_key_column, 
 
 
 # @functions_framework.cloud_event # HTTP 트리거로 변경하므로 이 데코레이터 제거
+@functions_framework.http # HTTP 트리거를 위한 데코레이터 추가
 def trigger_merge_tables(request):
     """
     HTTP 요청을 받아 테이블 병합을 트리거합니다.
