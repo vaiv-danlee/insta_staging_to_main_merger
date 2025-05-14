@@ -133,9 +133,24 @@ def merge_table(dataset_id, staging_table_id, main_table_id, unique_key_column, 
     if crawl_date_column:
         when_matched_condition = f" AND Source.`{crawl_date_column}` > Target.`{crawl_date_column}`"
 
+    # 소스 테이블 표현식: crawl_date_column이 제공되면 중복 제거
+    source_table_expression = f"`{GCP_PROJECT}.{dataset_id}.{staging_table_id}`"
+    if crawl_date_column:
+        partition_by_cols = [f"`{unique_key_column}`"]
+        if partition_filter_column:
+            partition_by_cols.append(f"`{partition_filter_column}`")
+        
+        partition_by_clause = ", ".join(partition_by_cols)
+        
+        source_table_expression = f"""(
+      SELECT *
+      FROM `{GCP_PROJECT}.{dataset_id}.{staging_table_id}`
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY {partition_by_clause} ORDER BY `{crawl_date_column}` DESC) = 1
+    )"""
+
     merge_sql = f"""
     MERGE {main_table_full_id} AS Target
-    USING {staging_table_full_id} AS Source
+    USING {source_table_expression} AS Source
     ON {on_condition}
     WHEN MATCHED{when_matched_condition} THEN
       UPDATE SET {update_set_clause}
@@ -144,7 +159,7 @@ def merge_table(dataset_id, staging_table_id, main_table_id, unique_key_column, 
       VALUES ({source_columns_clause})
     """
 
-    logging.info(f"Executing MERGE statement for {main_table_full_id} from {staging_table_full_id} on `{unique_key_column}`")
+    logging.info(f"Executing MERGE statement for {main_table_full_id} from {staging_table_id} on `{unique_key_column}` (deduplicated by {crawl_date_column if crawl_date_column else 'N/A'})")
     try:
         query_job = bigquery_client.query(merge_sql)
         query_job.result()

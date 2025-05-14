@@ -13,6 +13,7 @@
 *   **Profile 데이터 병합**: `PROFILE_STAGING_TABLE_ID`의 데이터를 `PROFILE_MAIN_TABLE_ID`로 병합합니다.
     *   고유 키: `user_id`
     *   최신 데이터 업데이트 기준 컬럼: `crawl_date`
+*   **스테이징 테이블 중복 처리**: 병합 대상 스테이징 테이블에 고유 키 (및 파티션 키)가 동일한 레코드가 여러 개 있을 경우, `crawl_date`가 가장 최신인 레코드 하나만 선택하여 병합을 수행합니다. (중복으로 인한 MERGE 오류 방지)
 *   **테이블 자동 생성**: 메인 테이블이 존재하지 않을 경우, 정의된 스키마에 따라 자동으로 생성합니다.
 *   **스테이징 테이블 비우기**: 데이터 병합 성공 후, 해당 스테이징 테이블의 모든 데이터를 삭제(TRUNCATE)합니다.
 *   **Cloud Logging**: 작업 진행 상황 및 오류를 Google Cloud Logging을 통해 기록합니다.
@@ -46,7 +47,8 @@ Cloud Function 배포 시 다음 환경 변수를 설정해야 합니다.
 
 *   `merge_table(dataset_id, staging_table_id, main_table_id, unique_key_column, main_table_schema_fields, partition_filter_column=None, crawl_date_column=None)`:
     *   주어진 정보를 바탕으로 BigQuery MERGE SQL 문을 생성하고 실행합니다.
-    *   `unique_key_column`을 기준으로 스테이징 테이블(Source)과 메인 테이블(Target)을 조인합니다.
+    *   **소스 데이터 중복 제거**: `crawl_date_column`이 제공된 경우, `USING` 절의 서브쿼리에서 `QUALIFY ROW_NUMBER() OVER (PARTITION BY unique_key_column [, partition_filter_column] ORDER BY crawl_date_column DESC) = 1` 조건을 사용하여 스테이징 테이블(Source)에서 각 고유 키별로 가장 최신의 `crawl_date`를 가진 행만 선택합니다. 이를 통해 "UPDATE/MERGE must match at most one source row for each target row" 오류를 방지합니다.
+    *   `unique_key_column`을 기준으로 (중복 제거된) 스테이징 테이블(Source)과 메인 테이블(Target)을 조인합니다.
     *   `partition_filter_column`이 제공되면 MERGE 문의 `ON` 조건에 추가되어 특정 파티션에 대해서만 병합을 시도합니다.
     *   `crawl_date_column`이 제공되면 `WHEN MATCHED` 조건에 추가되어, 스테이징 테이블의 `crawl_date`가 메인 테이블의 `crawl_date`보다 최신일 경우에만 업데이트를 수행합니다.
     *   `WHEN NOT MATCHED THEN INSERT`를 통해 새로운 데이터를 메인 테이블에 삽입합니다.
