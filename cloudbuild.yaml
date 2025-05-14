@@ -1,0 +1,49 @@
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'functions'
+      - 'deploy'
+      - 'insta-staging-to-main-merger' # 함수 이름 (새로운 함수 이름으로 변경)
+      - '--gen2'
+      - '--region=asia-northeast3' # insta_data_router와 동일한 리전 사용
+      - '--runtime=python312' # 런타임 변경
+      - '--source=.'
+      - '--entry-point=trigger_merge_tables' # main.py의 진입점 함수 이름
+      - '--trigger-http' # Pub/Sub 트리거에서 HTTP 트리거로 변경
+      - '--invoker=serviceAccount:pipeline-dan@mmm-lab.iam.gserviceaccount.com' # 호출자 서비스 계정 지정
+      - '--service-account=pipeline-dan@mmm-lab.iam.gserviceaccount.com'  # 런타임 서비스 계정 지정
+      - '--timeout=540s' # 필요에 따라 타임아웃 조정 (최대 540초)
+      - '--memory=256MB' # 필요에 따라 메모리 조정
+      - '--set-env-vars=GCP_PROJECT=${_GCP_PROJECT},BQ_DATASET=${_BQ_DATASET},POST_STAGING_TABLE_ID=${_POST_STAGING_TABLE_ID},POST_MAIN_TABLE_ID=${_POST_MAIN_TABLE_ID},PROFILE_STAGING_TABLE_ID=${_PROFILE_STAGING_TABLE_ID},PROFILE_MAIN_TABLE_ID=${_PROFILE_MAIN_TABLE_ID}'
+      # 필요한 경우 추가 환경 변수 설정 가능
+
+substitutions:
+  _GCP_PROJECT: 'mmm-lab' # insta_data_router와 동일한 프로젝트 또는 환경에 맞게 수정
+  _BQ_DATASET: 'sns' # insta_data_router와 동일한 데이터셋 또는 환경에 맞게 수정
+  _POST_STAGING_TABLE_ID: 'insta_media_mmm_v2_staging'
+  _POST_MAIN_TABLE_ID: 'insta_media_mmm_v2'
+  _PROFILE_STAGING_TABLE_ID: 'insta_profile_mmm_v2_staging'
+  _PROFILE_MAIN_TABLE_ID: 'insta_profile_mmm_v2'
+  # _SERVICE_ACCOUNT: 'your-service-account@your-project.iam.gserviceaccount.com' # 필요시 서비스 계정 지정
+
+# artifacts:
+#   objects:
+#     location: 'gs://${_ARTIFACT_BUCKET}/' # 빌드 아티팩트를 저장할 GCS 버킷 (선택 사항)
+#     paths: ['*.zip']
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  # machineType: 'N1_HIGHCPU_8' # 빌드 머신 타입 (필요시 조정)
+
+# 태그 기반 빌드 트리거를 사용하는 경우 (선택 사항)
+# triggers:
+# - github:
+#     name: merge-function-trigger
+#     branch: '^main$' # main 브랜치에 푸시될 때 빌드
+#     # commentControl: 'COMMENTS_ENABLED_FOR_EXTERNAL_CONTRIBUTORS_ONLY'
+#     substitutions:
+#       _GCP_PROJECT: 'mmm-lab'
+#       _BQ_DATASET: 'sns'
+#       # ... 기타 필요한 substitutions ...
+#     includedFiles:
+#     - 'insta_staging_to_main_merger/**' # 이 디렉토리의 변경사항에 대해서만 트리거 
