@@ -10,7 +10,6 @@ steps:
       - '--source=.'
       - '--entry-point=trigger_merge_tables' # main.py의 진입점 함수 이름
       - '--trigger-http' # Pub/Sub 트리거에서 HTTP 트리거로 변경
-      - '--invoker-service-accounts=pipeline-dan@mmm-lab.iam.gserviceaccount.com' # 호출자 서비스 계정 지정
       - '--service-account=pipeline-dan@mmm-lab.iam.gserviceaccount.com'  # 런타임 서비스 계정 지정
       - '--timeout=540s' # 필요에 따라 타임아웃 조정 (최대 540초)
       - '--memory=256MB' # 필요에 따라 메모리 조정
